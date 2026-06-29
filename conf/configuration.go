@@ -73,6 +73,7 @@ type configOptions struct {
 	MPVCmdTemplate                  string
 	CoverArtPriority                string
 	CoverArtQuality                 int
+	CoverArtMaxSize                 int
 	EnableWebPEncoding              bool
 	ArtistArtPriority               string
 	ArtistImageFolder               string
@@ -773,6 +774,7 @@ func setViperDefaults() {
 	viper.SetDefault("mpvcmdtemplate", "mpv --audio-device=%d --no-audio-display %f --input-ipc-server=%s")
 	viper.SetDefault("coverartpriority", "cover.*, folder.*, front.*, embedded, external")
 	viper.SetDefault("coverartquality", 75)
+	viper.SetDefault("coverartmaxsize", 0)
 	viper.SetDefault("enablewebpencoding", false)
 	viper.SetDefault("artistartpriority", "artist.*, album/artist.*, external")
 	viper.SetDefault("artistimagefolder", "")

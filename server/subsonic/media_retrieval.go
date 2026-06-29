@@ -66,6 +66,15 @@ func (api *Router) GetCoverArt(w http.ResponseWriter, r *http.Request) (*respons
 	size := p.IntOr("size", 0)
 	square := p.BoolOr("square", false)
 
+	// When a client requests the full-size original (size==0), some clients (e.g. Musiver)
+	// pull multi-MB embedded artwork, which saturates limited upload bandwidth. If
+	// CoverArtMaxSize is configured (>0), clamp the original request to that max dimension so
+	// the image is resized (and WebP-encoded when enabled) instead of served at full size.
+	// Default 0 keeps the original behavior unchanged.
+	if size == 0 && conf.Server.CoverArtMaxSize > 0 {
+		size = conf.Server.CoverArtMaxSize
+	}
+
 	imgReader, lastUpdate, err := api.artwork.GetOrPlaceholder(ctx, id, size, square)
 	switch {
 	case errors.Is(err, context.Canceled):
