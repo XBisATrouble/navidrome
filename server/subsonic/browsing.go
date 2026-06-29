@@ -345,23 +345,14 @@ func (api *Router) GetArtistInfo2(r *http.Request) (*responses.Subsonic, error) 
 }
 
 func (api *Router) GetSimilarSongs(r *http.Request) (*responses.Subsonic, error) {
-	ctx := r.Context()
 	p := req.Params(r)
-	id, err := p.String("id")
-	if err != nil {
-		return nil, err
-	}
-	count := p.IntOr("count", 50)
-
-	songs, err := api.provider.SimilarSongs(ctx, id, count)
-	if err != nil {
+	if _, err := p.String("id"); err != nil {
 		return nil, err
 	}
 
+	// 暂时屏蔽相似歌曲功能：不再调用外部元数据源，直接返回空列表。
 	response := newResponse()
-	response.SimilarSongs = &responses.SimilarSongs{
-		Song: slice.MapWithArg(songs, ctx, childFromMediaFile),
-	}
+	response.SimilarSongs = &responses.SimilarSongs{}
 	return response, nil
 }
 
