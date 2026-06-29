@@ -27,14 +27,18 @@ function storeAuthenticationInfo(authInfo) {
 }
 
 const authProvider = {
-  login: ({ username, password }) => {
+  login: ({ username, password, code, mode }) => {
     let url = baseUrl('/auth/login')
-    if (config.firstTime) {
+    let body = { username, password }
+    if (mode === 'register') {
+      url = baseUrl('/auth/register')
+      body = { username, password, code }
+    } else if (config.firstTime) {
       url = baseUrl('/auth/createAdmin')
     }
     const request = new Request(url, {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify(body),
       headers: new Headers({ 'Content-Type': 'application/json' }),
     })
     return fetch(request)

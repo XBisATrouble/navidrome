@@ -152,6 +152,100 @@ func createAdminUser(ctx context.Context, ds model.DataStore, username, password
 	return nil
 }
 
+func register(ds model.DataStore) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Self-registration is enabled only when a registration code is configured
+		if conf.Server.RegistrationCode == "" {
+			_ = rest.RespondWithError(w, http.StatusForbidden, "Self-registration is not enabled")
+			return
+		}
+
+		username, password, code, err := getRegistrationFromBody(r)
+		if err != nil {
+			log.Error(r, "parsing registration body", err)
+			_ = rest.RespondWithError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		if code != conf.Server.RegistrationCode {
+			log.Warn(r, "Registration rejected: invalid code", "username", username)
+			_ = rest.RespondWithError(w, http.StatusForbidden, "Invalid registration code")
+			return
+		}
+		if username == "" || password == "" {
+			_ = rest.RespondWithError(w, http.StatusUnprocessableEntity, "Username and password are required")
+			return
+		}
+
+		if err := createRegisteredUser(r.Context(), ds, username, password); err != nil {
+			if errors.Is(err, errUsernameTaken) {
+				_ = rest.RespondWithError(w, http.StatusConflict, "Username already exists")
+				return
+			}
+			log.Error(r, "Could not register user", "username", username, err)
+			_ = rest.RespondWithError(w, http.StatusInternalServerError, "Could not create user. Please try again")
+			return
+		}
+
+		doLogin(ds, username, password, w, r)
+	}
+}
+
+var errUsernameTaken = errors.New("username already exists")
+
+// createRegisteredUser creates a regular (non-admin) user and grants access to all
+// existing libraries, so the newly registered user can immediately browse music.
+func createRegisteredUser(ctx context.Context, ds model.DataStore, username, password string) error {
+	return ds.WithTx(func(tx model.DataStore) error {
+		userRepo := tx.User(ctx)
+		if existing, err := userRepo.FindByUsername(username); err == nil && existing != nil {
+			return errUsernameTaken
+		} else if err != nil && !errors.Is(err, model.ErrNotFound) {
+			return err
+		}
+
+		caser := cases.Title(language.Und)
+		newUser := model.User{
+			ID:          id.NewRandom(),
+			UserName:    username,
+			Name:        caser.String(username),
+			Email:       "",
+			NewPassword: password,
+			IsAdmin:     false,
+		}
+		if err := userRepo.Put(&newUser); err != nil {
+			return err
+		}
+
+		// Grant access to all existing libraries
+		libraries, err := tx.Library(ctx).GetAll()
+		if err != nil {
+			return err
+		}
+		libraryIDs := make([]int, 0, len(libraries))
+		for _, lib := range libraries {
+			libraryIDs = append(libraryIDs, lib.ID)
+		}
+		if len(libraryIDs) > 0 {
+			if err := userRepo.SetUserLibraries(newUser.ID, libraryIDs); err != nil {
+				return err
+			}
+		}
+		log.Info(ctx, "Registered new user via self-registration", "user", username, "id", newUser.ID)
+		return nil
+	}, "self-registration")
+}
+
+func getRegistrationFromBody(r *http.Request) (username, password, code string, err error) {
+	data := make(map[string]string)
+	decoder := json.NewDecoder(r.Body)
+	if err = decoder.Decode(&data); err != nil {
+		log.Error(r, "parsing request body", err)
+		err = errors.New("invalid request payload")
+		return
+	}
+	return data["username"], data["password"], data["code"], nil
+}
+
 func validateLogin(userRepo model.UserRepository, userName, password string) (*model.User, error) {
 	u, err := userRepo.FindByUsernameWithPassword(userName)
 	if errors.Is(err, model.ErrNotFound) {

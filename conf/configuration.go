@@ -103,6 +103,7 @@ type configOptions struct {
 	AuthRequestLimit                int
 	AuthWindowLength                time.Duration
 	PasswordEncryptionKey           string
+	RegistrationCode                string
 	ExtAuth                         extAuthOptions
 	Plugins                         pluginsOptions
 	HTTPHeaders                     httpHeaderOptions   `json:",omitzero"`
@@ -805,6 +806,7 @@ func setViperDefaults() {
 	viper.SetDefault("authrequestlimit", 5)
 	viper.SetDefault("authwindowlength", 20*time.Second)
 	viper.SetDefault("passwordencryptionkey", "")
+	viper.SetDefault("registrationcode", "")
 	viper.SetDefault("extauth.userheader", "Remote-User")
 	viper.SetDefault("extauth.trustedsources", "")
 	viper.SetDefault("extauth.logouturl", "")

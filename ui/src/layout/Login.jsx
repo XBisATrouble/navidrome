@@ -110,7 +110,7 @@ const renderInput = ({
   />
 )
 
-const FormLogin = ({ loading, handleSubmit, validate }) => {
+const FormLogin = ({ loading, handleSubmit, validate, onSwitchToRegister }) => {
   const translate = useTranslate()
   const classes = useStyles()
 
@@ -177,6 +177,18 @@ const FormLogin = ({ loading, handleSubmit, validate }) => {
                   {translate('ra.auth.sign_in')}
                 </Button>
               </CardActions>
+              {config.enableRegistration && (
+                <div className={classes.message}>
+                  <Link
+                    component="button"
+                    type="button"
+                    onClick={onSwitchToRegister}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {translate('ra.auth.registerLink')}
+                  </Link>
+                </div>
+              )}
             </Card>
             <Notification />
           </div>
@@ -316,8 +328,98 @@ const FormSignUp = ({ loading, handleSubmit, validate }) => {
   )
 }
 
+const FormRegister = ({ loading, handleSubmit, validate, onBackToLogin }) => {
+  const translate = useTranslate()
+  const classes = useStyles()
+
+  return (
+    <Form
+      onSubmit={handleSubmit}
+      validate={validate}
+      render={({ handleSubmit }) => (
+        <form onSubmit={handleSubmit} noValidate>
+          <div className={classes.main}>
+            <Card className={classes.card}>
+              <div className={classes.avatar}>
+                <img src={Logo} className={classes.icon} alt={'logo'} />
+              </div>
+              <div className={classes.welcome}>
+                {translate('ra.auth.registerTitle')}
+              </div>
+              <div className={classes.form}>
+                <div className={classes.input}>
+                  <Field
+                    autoFocus
+                    name="username"
+                    component={renderInput}
+                    label={translate('ra.auth.username')}
+                    disabled={loading}
+                    spellCheck={false}
+                  />
+                </div>
+                <div className={classes.input}>
+                  <Field
+                    name="password"
+                    component={renderInput}
+                    label={translate('ra.auth.password')}
+                    type="password"
+                    disabled={loading}
+                  />
+                </div>
+                <div className={classes.input}>
+                  <Field
+                    name="confirmPassword"
+                    component={renderInput}
+                    label={translate('ra.auth.confirmPassword')}
+                    type="password"
+                    disabled={loading}
+                  />
+                </div>
+                <div className={classes.input}>
+                  <Field
+                    name="code"
+                    component={renderInput}
+                    label={translate('ra.auth.registrationCode')}
+                    disabled={loading}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+              <CardActions className={classes.actions}>
+                <Button
+                  variant="contained"
+                  type="submit"
+                  color="primary"
+                  disabled={loading}
+                  className={classes.button}
+                  fullWidth
+                >
+                  {loading && <CircularProgress size={25} thickness={2} />}
+                  {translate('ra.auth.buttonRegister')}
+                </Button>
+              </CardActions>
+              <div className={classes.message}>
+                <Link
+                  component="button"
+                  type="button"
+                  onClick={onBackToLogin}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {translate('ra.auth.backToLogin')}
+                </Link>
+              </div>
+            </Card>
+            <Notification />
+          </div>
+        </form>
+      )}
+    />
+  )
+}
+
 const Login = ({ location }) => {
   const [loading, setLoading] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
   const translate = useTranslate()
   const notify = useNotify()
   const login = useLogin()
@@ -342,6 +444,11 @@ const Login = ({ location }) => {
       )
     },
     [dispatch, login, notify, setLoading, location],
+  )
+
+  const handleRegister = useCallback(
+    (auth) => handleSubmit({ ...auth, mode: 'register' }),
+    [handleSubmit],
   )
 
   const validateLogin = useCallback(
@@ -376,6 +483,17 @@ const Login = ({ location }) => {
     [translate, validateLogin],
   )
 
+  const validateRegister = useCallback(
+    (values) => {
+      const errors = validateSignup(values)
+      if (!values.code) {
+        errors.code = translate('ra.validation.required')
+      }
+      return errors
+    },
+    [translate, validateSignup],
+  )
+
   if (config.firstTime) {
     return (
       <FormSignUp
@@ -385,11 +503,22 @@ const Login = ({ location }) => {
       />
     )
   }
+  if (showRegister && config.enableRegistration) {
+    return (
+      <FormRegister
+        handleSubmit={handleRegister}
+        validate={validateRegister}
+        loading={loading}
+        onBackToLogin={() => setShowRegister(false)}
+      />
+    )
+  }
   return (
     <FormLogin
       handleSubmit={handleSubmit}
       validate={validateLogin}
       loading={loading}
+      onSwitchToRegister={() => setShowRegister(true)}
     />
   )
 }

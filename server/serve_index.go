@@ -42,6 +42,7 @@ func serveIndex(ds model.DataStore, fs fs.FS, shareInfo *model.Share) http.Handl
 		appConfig := map[string]any{
 			"version":                   consts.Version,
 			"firstTime":                 firstTime,
+			"enableRegistration":        conf.Server.RegistrationCode != "",
 			"variousArtistsId":          consts.VariousArtistsID,
 			"baseURL":                   str.SanitizeText(strings.TrimSuffix(conf.Server.BasePath, "/")),
 			"loginBackgroundURL":        str.SanitizeText(conf.Server.UILoginBackgroundURL),
