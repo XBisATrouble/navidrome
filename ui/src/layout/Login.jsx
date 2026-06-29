@@ -104,19 +104,22 @@ const useStyles = makeStyles(
 )
 
 const renderInput = ({
-  meta: { touched, error } = {},
+  meta: { submitFailed, error } = {},
   input: { ...inputProps },
   ...props
 }) => (
   <TextField
-    error={!!(touched && error)}
+    // 只在提交失败后(点了主按钮)才显示校验错误,而非字段 blur 时。
+    // 否则 blur 弹出的 helperText 会把下方链接挤下去,导致点链接时
+    // mousedown→mouseup 之间布局抖动、click 落空,需点两次。
+    error={!!(submitFailed && error)}
     inputProps={{
       // mobile keyboards: suppress capitalization and correction for login related fields
       autocapitalize: 'none',
       autocorrect: 'off',
       ...inputProps,
     }}
-    helperText={touched && error}
+    helperText={submitFailed && error}
     {...props}
     fullWidth
   />
@@ -194,7 +197,12 @@ const FormLogin = ({ loading, handleSubmit, validate, onSwitchToRegister }) => {
                   <Link
                     component="button"
                     type="button"
-                    onClick={onSwitchToRegister}
+                    onClick={(e) => {
+                      // 阻止该按钮触发表单 submit（否则会先跑登录校验、
+                      // 弹出"用户名必填"，导致需要点两次才能进注册页）
+                      e.preventDefault()
+                      onSwitchToRegister()
+                    }}
                     style={{ cursor: 'pointer' }}
                   >
                     {translate('ra.auth.registerLink')}
@@ -414,7 +422,11 @@ const FormRegister = ({ loading, handleSubmit, validate, onBackToLogin }) => {
                 <Link
                   component="button"
                   type="button"
-                  onClick={onBackToLogin}
+                  onClick={(e) => {
+                    // 同上，阻止 submit 副作用
+                    e.preventDefault()
+                    onBackToLogin()
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
                   {translate('ra.auth.backToLogin')}
