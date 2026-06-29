@@ -32,10 +32,22 @@ const useStyles = makeStyles(
       minHeight: '100vh',
       alignItems: 'center',
       justifyContent: 'flex-start',
-      background: `url(${config.loginBackgroundURL})`,
-      backgroundRepeat: 'no-repeat',
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      // 未显式配置自定义背景图时（默认随机图 /backgrounds 或哨兵 'theme'/空值），
+      // 背景跟随当前主题的底色，保持简约统一；配置了图片则正常显示图片。
+      ...(!config.loginBackgroundURL ||
+      config.loginBackgroundURL === 'theme' ||
+      config.loginBackgroundURL === '/backgrounds'
+        ? {
+            backgroundColor:
+              theme.palette.background.default ||
+              (theme.palette.type === 'dark' ? '#303030' : '#fafafa'),
+          }
+        : {
+            background: `url(${config.loginBackgroundURL})`,
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }),
     },
     card: {
       minWidth: 300,
