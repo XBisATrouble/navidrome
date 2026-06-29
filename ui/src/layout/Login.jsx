@@ -388,15 +388,6 @@ const FormRegister = ({ loading, handleSubmit, validate, onBackToLogin }) => {
                 </div>
                 <div className={classes.input}>
                   <Field
-                    name="confirmPassword"
-                    component={renderInput}
-                    label={translate('ra.auth.confirmPassword')}
-                    type="password"
-                    disabled={loading}
-                  />
-                </div>
-                <div className={classes.input}>
-                  <Field
                     name="code"
                     component={renderInput}
                     label={translate('ra.auth.registrationCode')}
@@ -509,13 +500,18 @@ const Login = ({ location }) => {
 
   const validateRegister = useCallback(
     (values) => {
-      const errors = validateSignup(values)
+      // 注册页不要求确认密码,只校验用户名/密码/邀请码
+      const errors = validateLogin(values)
+      const regex = /^\w+$/g
+      if (values.username && !values.username.match(regex)) {
+        errors.username = translate('ra.validation.invalidChars')
+      }
       if (!values.code) {
         errors.code = translate('ra.validation.required')
       }
       return errors
     },
-    [translate, validateSignup],
+    [translate, validateLogin],
   )
 
   if (config.firstTime) {
