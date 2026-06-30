@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/navidrome/navidrome/conf"
 	"github.com/navidrome/navidrome/core/stream"
 	"github.com/navidrome/navidrome/log"
 	"github.com/navidrome/navidrome/model"
@@ -299,6 +300,13 @@ func (api *Router) GetTranscodeDecision(w http.ResponseWriter, r *http.Request) 
 	if player, ok := request.PlayerFrom(ctx); ok && clientInfo.CapBitrate(player.MaxBitRate) {
 		log.Debug(ctx, "Applied player MaxBitRate cap to transcode decision",
 			"playerMaxBitRate", player.MaxBitRate, "client", clientInfo.Name)
+	}
+
+	// Apply the server-wide MaxStreamBitRate cap so no client can negotiate a
+	// stream above the configured ceiling, regardless of its declared limits.
+	if conf.Server.MaxStreamBitRate > 0 && clientInfo.CapBitrate(conf.Server.MaxStreamBitRate) {
+		log.Debug(ctx, "Applied server-wide MaxStreamBitRate cap to transcode decision",
+			"maxStreamBitRate", conf.Server.MaxStreamBitRate, "client", clientInfo.Name)
 	}
 
 	// Get media file

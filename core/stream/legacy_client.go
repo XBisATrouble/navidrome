@@ -12,7 +12,7 @@ import (
 
 // buildLegacyClientInfo translates legacy Subsonic stream/download parameters
 // into a ClientInfo for use with MakeDecision.
-func buildLegacyClientInfo(mf *model.MediaFile, reqFormat string, reqBitRate int, playerMaxBitRate int) *ClientInfo {
+func buildLegacyClientInfo(mf *model.MediaFile, reqFormat string, reqBitRate int, playerMaxBitRate int, globalMaxBitRate int) *ClientInfo {
 	ci := &ClientInfo{Name: "legacy"}
 
 	// Determine target format for transcoding
@@ -25,6 +25,12 @@ func buildLegacyClientInfo(mf *model.MediaFile, reqFormat string, reqBitRate int
 	case playerMaxBitRate > 0 && playerMaxBitRate < mf.BitRate && conf.Server.DefaultDownsamplingFormat != "":
 		// Server-side player MaxBitRate alone forces downsampling, even when the
 		// client sent no format/bitrate params (issue #5583, legacy /stream path).
+		targetFormat = conf.Server.DefaultDownsamplingFormat
+	case globalMaxBitRate > 0 && globalMaxBitRate < mf.BitRate && conf.Server.DefaultDownsamplingFormat != "":
+		// Server-wide MaxStreamBitRate forces downsampling for any source that
+		// exceeds the cap, independent of client/player params. Without a
+		// transcoding profile here the decision would fall back to raw and the
+		// cap would be defeated.
 		targetFormat = conf.Server.DefaultDownsamplingFormat
 	}
 
@@ -72,7 +78,9 @@ func (s *deciderService) ResolveRequest(ctx context.Context, mf *model.MediaFile
 		playerMaxBitRate = player.MaxBitRate
 	}
 
-	clientInfo := buildLegacyClientInfo(mf, reqFormat, reqBitRate, playerMaxBitRate)
+	globalMaxBitRate := conf.Server.MaxStreamBitRate
+
+	clientInfo := buildLegacyClientInfo(mf, reqFormat, reqBitRate, playerMaxBitRate, globalMaxBitRate)
 
 	// Apply server-side player transcoding override before making the decision
 	if trc, ok := request.TranscodingFrom(ctx); ok && trc.TargetFormat != "" {
@@ -82,6 +90,16 @@ func (s *deciderService) ResolveRequest(ctx context.Context, mf *model.MediaFile
 		if modified.CapBitrate(player.MaxBitRate) {
 			clientInfo = &modified
 			log.Debug(ctx, "Applied player MaxBitRate cap", "playerMaxBitRate", player.MaxBitRate, "client", clientInfo.Name)
+		}
+	}
+
+	// Apply the server-wide MaxStreamBitRate cap last so it constrains every
+	// path (raw direct play is already short-circuited above via reqFormat=="raw").
+	if globalMaxBitRate > 0 {
+		modified := *clientInfo
+		if modified.CapBitrate(globalMaxBitRate) {
+			clientInfo = &modified
+			log.Debug(ctx, "Applied server-wide MaxStreamBitRate cap", "maxStreamBitRate", globalMaxBitRate, "client", clientInfo.Name)
 		}
 	}
 

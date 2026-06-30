@@ -62,6 +62,7 @@ type configOptions struct {
 	SmartPlaylistRefreshDelay       time.Duration
 	AutoTranscodeDownload           bool
 	DefaultDownsamplingFormat       string
+	MaxStreamBitRate                int
 	Search                          searchOptions  `json:",omitzero"`
 	Matcher                         matcherOptions `json:",omitzero"`
 	RecentlyAddedByModTime          bool
@@ -762,6 +763,9 @@ func setViperDefaults() {
 	viper.SetDefault("enablemediafilecoverart", true)
 	viper.SetDefault("autotranscodedownload", false)
 	viper.SetDefault("defaultdownsamplingformat", consts.DefaultDownsamplingFormat)
+	// MaxStreamBitRate caps every stream's audio bitrate (kbps) server-side,
+	// regardless of what the client requests. 0 means no global cap.
+	viper.SetDefault("maxstreambitrate", 0)
 	viper.SetDefault("search.fullstring", false)
 	viper.SetDefault("search.backend", "fts")
 	viper.SetDefault("matcher.preferstarred", true)
