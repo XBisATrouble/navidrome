@@ -258,15 +258,22 @@ func (e *provider) populateArtistInfo(ctx context.Context, artist auxArtist) (au
 	// Call all registered agents and collect information
 	g := errgroup.Group{}
 	g.SetLimit(2)
-	g.Go(func() error { e.callGetImage(ctx, e.ag, &artist); return nil })
-	g.Go(func() error { e.callGetBiography(ctx, e.ag, &artist); return nil })
+	g.Go(func() error { return e.callGetImage(ctx, e.ag, &artist) })
+	g.Go(func() error { return e.callGetBiography(ctx, e.ag, &artist) })
 	g.Go(func() error { e.callGetURL(ctx, e.ag, &artist); return nil })
 	g.Go(func() error { e.callGetSimilarArtists(ctx, e.ag, &artist, maxSimilarArtists, true); return nil })
-	_ = g.Wait()
+	transientErr := g.Wait()
 
 	if utils.IsCtxDone(ctx) {
 		log.Warn(ctx, "ArtistInfo update canceled", "id", artist.ID, "name", artistName, "elapsed", time.Since(start), ctx.Err())
 		return artist, ctx.Err()
+	}
+
+	// 如果图片或简介因网络抖动失败（非 ErrNotFound），跳过写时间戳，等待下次重试
+	if transientErr != nil {
+		log.Warn(ctx, "ArtistInfo fetch had transient errors, skipping cache write", "id", artist.ID, "name", artistName,
+			"elapsed", time.Since(start), "err", transientErr)
+		return artist, nil
 	}
 
 	artist.ExternalInfoUpdatedAt = new(time.Now())
@@ -509,20 +516,27 @@ func (e *provider) callGetURL(ctx context.Context, agent agents.ArtistURLRetriev
 	artist.ExternalUrl = artisURL
 }
 
-func (e *provider) callGetBiography(ctx context.Context, agent agents.ArtistBiographyRetriever, artist *auxArtist) {
+func (e *provider) callGetBiography(ctx context.Context, agent agents.ArtistBiographyRetriever, artist *auxArtist) error {
 	bio, err := agent.GetArtistBiography(ctx, artist.ID, artist.Name(), artist.MbzArtistID)
 	if err != nil {
-		return
+		if errors.Is(err, agents.ErrNotFound) {
+			return nil
+		}
+		return err
 	}
 	bio = str.SanitizeText(bio)
 	bio = strings.ReplaceAll(bio, "\n", " ")
 	artist.Biography = strings.ReplaceAll(bio, "<a ", "<a target='_blank' ")
+	return nil
 }
 
-func (e *provider) callGetImage(ctx context.Context, agent agents.ArtistImageRetriever, artist *auxArtist) {
+func (e *provider) callGetImage(ctx context.Context, agent agents.ArtistImageRetriever, artist *auxArtist) error {
 	images, err := agent.GetArtistImages(ctx, artist.ID, artist.Name(), artist.MbzArtistID)
 	if err != nil {
-		return
+		if errors.Is(err, agents.ErrNotFound) {
+			return nil
+		}
+		return err
 	}
 	sort.Slice(images, func(i, j int) bool { return images[i].Size > images[j].Size })
 
@@ -535,6 +549,7 @@ func (e *provider) callGetImage(ctx context.Context, agent agents.ArtistImageRet
 	if len(images) >= 3 {
 		artist.SmallImageUrl = images[2].URL
 	}
+	return nil
 }
 
 func (e *provider) callGetSimilarArtists(ctx context.Context, agent agents.ArtistSimilarRetriever, artist *auxArtist,
